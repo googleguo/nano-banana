@@ -10,7 +10,7 @@ app.use(express.json({ limit: '50mb' }));
 
 // Initialize Gemini with API key from environment
 // ideally configured in a .env file or environment variables
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const IMAGE_MODEL_NAME = 'gemini-2.5-flash-image';
 const TEXT_MODEL_NAME = 'gemini-2.5-flash';
@@ -19,9 +19,9 @@ const TEXT_MODEL_NAME = 'gemini-2.5-flash';
 app.post('/api/generate-image', async (req, res) => {
   try {
     const { prompt, imageBase64, aspectRatio } = req.body;
-    
+
     const parts = [];
-    
+
     // If an image is provided (Image-to-Image / Edit), add it to parts
     if (imageBase64) {
       // Strip data URI prefix to get raw base64
@@ -48,7 +48,7 @@ app.post('/api/generate-image', async (req, res) => {
     // Extract the generated image from the response
     const content = response.candidates?.[0]?.content;
     const imagePart = content?.parts?.find(p => p.inlineData);
-    
+
     if (imagePart?.inlineData?.data) {
       // Return as Data URL
       res.json({ image: `data:image/png;base64,${imagePart.inlineData.data}` });
@@ -66,7 +66,7 @@ app.post('/api/generate-image', async (req, res) => {
 app.post('/api/optimize-prompt', async (req, res) => {
   try {
     const { prompt } = req.body;
-    
+
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
     }

@@ -2,7 +2,7 @@ import { GoogleGenAI, Part } from "@google/genai";
 import { AspectRatio } from "../types";
 
 // Initialize client-side AI for fallback scenarios
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const IMAGE_MODEL_NAME = 'gemini-2.5-flash-image';
 const TEXT_MODEL_NAME = 'gemini-2.5-flash';
