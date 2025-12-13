@@ -8,7 +8,7 @@ const IMAGE_MODEL_NAME = 'gemini-2.5-flash-image';
 const TEXT_MODEL_NAME = 'gemini-2.5-flash';
 
 // Server URL - Assumes server.js is running locally on port 3000
-const SERVER_API_URL = 'http://localhost:3000/api';
+const SERVER_API_URL = 'https://nanobanana.soravideo.ltd/api';
 
 interface GenerateOptions {
   prompt: string;
