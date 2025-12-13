@@ -1,12 +1,14 @@
 import { GoogleGenAI, Part } from "@google/genai";
 import { AspectRatio } from "../types";
 
+// Initialize client-side AI for fallback scenarios
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Using 'gemini-2.5-flash-image' for image generation
 const IMAGE_MODEL_NAME = 'gemini-2.5-flash-image';
-// Using 'gemini-2.5-flash' for text optimization tasks
 const TEXT_MODEL_NAME = 'gemini-2.5-flash';
+
+// Server URL - Assumes server.js is running locally on port 3000
+const SERVER_API_URL = 'http://localhost:3000/api';
 
 interface GenerateOptions {
   prompt: string;
@@ -14,43 +16,87 @@ interface GenerateOptions {
   aspectRatio?: AspectRatio;
 }
 
-export const generateImageContent = async (options: GenerateOptions): Promise<string> => {
-  const { prompt, imageBase64, aspectRatio = AspectRatio.SQUARE } = options;
+// --- Main Exported Functions ---
 
+export const generateImageContent = async (options: GenerateOptions): Promise<string> => {
+  try {
+    // Attempt to call the server-side endpoint
+    const response = await fetch(`${SERVER_API_URL}/generate-image`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(options),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.image;
+
+  } catch (serverError) {
+    console.warn("Backend server unavailable or failed. Falling back to client-side generation.", serverError);
+    // Fallback to client-side execution if server fails
+    return generateImageContentClient(options);
+  }
+};
+
+export const optimizePrompt = async (originalPrompt: string): Promise<string> => {
+  if (!originalPrompt.trim()) return "";
+
+  try {
+    // Attempt to call the server-side endpoint
+    const response = await fetch(`${SERVER_API_URL}/optimize-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt: originalPrompt }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.optimizedPrompt;
+
+  } catch (serverError) {
+    console.warn("Backend server unavailable or failed. Falling back to client-side optimization.", serverError);
+    // Fallback to client-side execution if server fails
+    return optimizePromptClient(originalPrompt);
+  }
+};
+
+// --- Client-Side Implementations (Fallback) ---
+
+const generateImageContentClient = async (options: GenerateOptions): Promise<string> => {
+  const { prompt, imageBase64, aspectRatio = AspectRatio.SQUARE } = options;
   const parts: Part[] = [];
 
-  // If there is an input image, add it first (standard practice for image+text prompt)
   if (imageBase64) {
-    // Strip data URI prefix if present to get raw base64
     const base64Data = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
-    
     parts.push({
       inlineData: {
         data: base64Data,
-        mimeType: 'image/png', // Sending as PNG usually works best, Gemini handles conversion
+        mimeType: 'image/png',
       }
     });
   }
 
-  // Add the text prompt
   parts.push({ text: prompt });
 
   try {
     const response = await ai.models.generateContent({
       model: IMAGE_MODEL_NAME,
-      contents: {
-        parts: parts,
-      },
+      contents: { parts },
       config: {
-        imageConfig: {
-          aspectRatio: aspectRatio,
-        },
-        // responseMimeType is NOT supported for nano banana
-        // responseSchema is NOT supported for nano banana
+        imageConfig: { aspectRatio },
       },
     });
 
-    // Parse response to find the image part
     if (response.candidates && response.candidates.length > 0) {
       const content = response.candidates[0].content;
       if (content && content.parts) {
@@ -61,18 +107,14 @@ export const generateImageContent = async (options: GenerateOptions): Promise<st
         }
       }
     }
-
     throw new Error("No image data found in the response.");
-
   } catch (error) {
-    console.error("Gemini Generation Error:", error);
+    console.error("Client-side Generation Error:", error);
     throw error;
   }
 };
 
-export const optimizePrompt = async (originalPrompt: string): Promise<string> => {
-  if (!originalPrompt.trim()) return "";
-
+const optimizePromptClient = async (originalPrompt: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
       model: TEXT_MODEL_NAME,
@@ -87,8 +129,7 @@ export const optimizePrompt = async (originalPrompt: string): Promise<string> =>
 
     return response.text?.trim() || originalPrompt;
   } catch (error) {
-    console.error("Prompt Optimization Error:", error);
-    // Fallback to original prompt if optimization fails
+    console.error("Client-side Optimization Error:", error);
     return originalPrompt;
   }
 };
