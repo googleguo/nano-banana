@@ -7,8 +7,9 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const IMAGE_MODEL_NAME = 'gemini-2.5-flash-image';
 const TEXT_MODEL_NAME = 'gemini-2.5-flash';
 
-// Server URL - Assumes server.js is running locally on port 3000
-const SERVER_API_URL = 'https://nanobanana.soravideo.ltd/api';
+// Use relative path for Vercel deployment (serverless functions live at /api)
+// When running locally with 'vercel dev', this also works.
+const SERVER_API_URL = '/api';
 
 interface GenerateOptions {
   prompt: string;
@@ -20,7 +21,7 @@ interface GenerateOptions {
 
 export const generateImageContent = async (options: GenerateOptions): Promise<string> => {
   try {
-    // Attempt to call the server-side endpoint
+    // Attempt to call the server-side endpoint (Vercel Function)
     const response = await fetch(`${SERVER_API_URL}/generate-image`, {
       method: 'POST',
       headers: {
@@ -30,6 +31,7 @@ export const generateImageContent = async (options: GenerateOptions): Promise<st
     });
 
     if (!response.ok) {
+      // If endpoint fails (e.g. body too large or timeout), throw to trigger fallback
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
 
@@ -37,7 +39,7 @@ export const generateImageContent = async (options: GenerateOptions): Promise<st
     return data.image;
 
   } catch (serverError) {
-    console.warn("Backend server unavailable or failed. Falling back to client-side generation.", serverError);
+    console.warn("Backend serverless function unavailable or failed. Falling back to client-side generation.", serverError);
     // Fallback to client-side execution if server fails
     return generateImageContentClient(options);
   }
@@ -47,7 +49,7 @@ export const optimizePrompt = async (originalPrompt: string): Promise<string> =>
   if (!originalPrompt.trim()) return "";
 
   try {
-    // Attempt to call the server-side endpoint
+    // Attempt to call the server-side endpoint (Vercel Function)
     const response = await fetch(`${SERVER_API_URL}/optimize-prompt`, {
       method: 'POST',
       headers: {
@@ -64,7 +66,7 @@ export const optimizePrompt = async (originalPrompt: string): Promise<string> =>
     return data.optimizedPrompt;
 
   } catch (serverError) {
-    console.warn("Backend server unavailable or failed. Falling back to client-side optimization.", serverError);
+    console.warn("Backend serverless function unavailable or failed. Falling back to client-side optimization.", serverError);
     // Fallback to client-side execution if server fails
     return optimizePromptClient(originalPrompt);
   }
@@ -88,9 +90,14 @@ const generateImageContentClient = async (options: GenerateOptions): Promise<str
 
   parts.push({ text: prompt });
 
+  let model_name = TEXT_MODEL_NAME;
+  if (imageBase64) {
+    model_name = IMAGE_MODEL_NAME;
+  }
+
   try {
     const response = await ai.models.generateContent({
-      model: IMAGE_MODEL_NAME,
+      model: model_name,
       contents: { parts },
       config: {
         imageConfig: { aspectRatio },
