@@ -7,13 +7,35 @@ interface ResultCardProps {
 }
 
 const ResultCard: React.FC<ResultCardProps> = ({ image }) => {
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = image.url;
-    link.download = `nano-banana-${image.id}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      // Mobile browsers often struggle with large Data URIs in anchor tags.
+      // Converting to a Blob and using createObjectURL is much more reliable.
+      const response = await fetch(image.url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `nano-banana-${image.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Blob download failed, attempting fallback:", err);
+      // Fallback: Try direct Data URI download (works on desktop, might fail on some mobile)
+      const link = document.createElement('a');
+      link.href = image.url;
+      link.download = `nano-banana-${image.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
@@ -28,7 +50,8 @@ const ResultCard: React.FC<ResultCardProps> = ({ image }) => {
           <p className="text-white text-sm line-clamp-2 mb-3">{image.prompt}</p>
           <button
             onClick={handleDownload}
-            className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/50 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+            type="button"
+            className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/50 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors active:scale-95"
           >
             <DownloadIcon className="w-4 h-4" />
             Download
